@@ -78,14 +78,6 @@ a := auth.New("token")
 h := httpclient.New(httpclient.WithAuthFn(a.BearAuth()))
 ```
 
-## kbsink-cli / WASM
-
-Host bridges still use `net/http` **inside** retryablehttp:
-
-```go
-h := netclient.FromHostHTTP(hostClient) // wraps host *http.Client in retryablehttp
-```
-
 ## Development
 
 ```bash

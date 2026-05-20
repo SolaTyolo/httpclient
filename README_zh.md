@@ -78,14 +78,6 @@ a := auth.New("token")
 h := httpclient.New(httpclient.WithAuthFn(a.BearAuth()))
 ```
 
-## kbsink-cli / WASM
-
-宿主仍可提供 `*http.Client`，由 retryablehttp 包装：
-
-```go
-h := netclient.FromHostHTTP(hostClient)
-```
-
 ## 开发
 
 ```bash
