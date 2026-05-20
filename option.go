@@ -1,41 +1,67 @@
 package httpclient
 
 import (
-	"context"
-	"net/http"
+	"time"
+
+	"github.com/SolaTyolo/httpclient/auth"
+	"github.com/SolaTyolo/httpclient/retry"
+	"github.com/SolaTyolo/httpclient/transport"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
-type ClientOption func(*HTTP)
+// ClientOption configures [HTTP] / [New].
+type ClientOption func(*clientConfig)
 
-func WithKey(key string) ClientOption {
-	return func(h *HTTP) {
-		h.key = key
+type clientConfig struct {
+	retry         retry.Config
+	requester     transport.Requester
+	authenticator auth.Func
+}
+
+// WithTimeout sets per-attempt timeout on the underlying retryablehttp client.
+func WithTimeout(d time.Duration) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.retry.Timeout = d
 	}
 }
 
-// WithHTTPRequester sets the HTTP requester for a given client, used mostly for testing.
-func WithHTTPRequester(requester Requester) ClientOption {
-	return func(c *HTTP) {
-		c.requester = requester
+// WithRetryMax sets maximum retry attempts.
+func WithRetryMax(n int) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.retry.RetryMax = n
 	}
 }
 
-func WithAuthFn(fn AuthFunc) ClientOption {
-	return func(c *HTTP) {
-		c.authenticator = fn
+// WithRetryWait sets backoff bounds between retries.
+func WithRetryWait(min, max time.Duration) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.retry.RetryWaitMin = min
+		cfg.retry.RetryWaitMax = max
 	}
 }
 
-func NoCheckRetryFn(ctx context.Context, resp *http.Response, err error) (bool, error) {
-	return false, err
+// WithCheckRetry sets the retry policy (e.g. retry.DefaultRetryFn, retry.NoCheckRetryFn).
+func WithCheckRetry(fn retryablehttp.CheckRetry) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.retry.CheckRetry = fn
+	}
 }
 
-func DefaultRetryFn(ctx context.Context, resp *http.Response, err error) (bool, error) {
-	if err != nil {
-		return false, err
+// WithAuthFn runs before each JSON API request.
+func WithAuthFn(fn auth.Func) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.authenticator = fn
 	}
-	if resp.StatusCode >= 500 {
-		return true, nil
+}
+
+// WithRequester sets the transport. Use [WithRetryableClient] for the common case.
+func WithRequester(r transport.Requester) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.requester = r
 	}
-	return false, err
+}
+
+// WithRetryableClient sets a *retryablehttp.Client as the transport.
+func WithRetryableClient(c *retryablehttp.Client) ClientOption {
+	return WithRequester(c)
 }

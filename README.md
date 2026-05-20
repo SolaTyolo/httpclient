@@ -1,22 +1,97 @@
-Httpclient
-===========
+# httpclient
 
-HTTP Client Based on go-retryablehttp
+[中文文档](README_zh.md)
 
+Retryable JSON HTTP client for Go, built on [go-retryablehttp](https://github.com/hashicorp/go-retryablehttp). All requests use `*retryablehttp.Client` — there is no separate `net/http`-only transport path.
 
-Example Use
-===========
+## Install
 
-Using this library should look almost identical to what you would do with
-`net/http`. The most simple example of a GET request is shown below:
-
-```go
-resp, err := httpclient.Default().Get("/foo")
-if err != nil {
-    panic(err)
-}
+```bash
+go get github.com/SolaTyolo/httpclient
 ```
 
+Go 1.19+.
 
-For more usage and examples see the
-[godoc](https://pkg.go.dev/github.com/SolaTyolo/httpclient).
+## Layout
+
+```
+httpclient/
+├── client.go      # HTTP, New, Requester
+├── option.go      # ClientOption, With*
+├── request.go     # Get / Post / Put / Delete
+├── transport/     # Requester interface
+├── retry/         # Defaults, policies, NewClient
+├── auth/          # Bearer / Basic helpers
+├── response/      # Response, StatusError, DecodeJSON
+└── endpoint/      # URL + query builder
+```
+
+Import the root package for typical use; import subpackages when you only need one concern.
+
+## Quick start
+
+```go
+import (
+    "github.com/SolaTyolo/httpclient"
+    "github.com/SolaTyolo/httpclient/response"
+)
+
+h := httpclient.New(httpclient.WithTimeout(30 * time.Second))
+resp, err := h.Post(ctx, url, body)
+if err != nil {
+    var se *response.StatusError
+    if errors.As(err, &se) { /* se.StatusCode, se.Body */ }
+    return err
+}
+var out MyType
+return resp.DecodeJSON(&out)
+```
+
+Defaults: **3 retries**, **5s** timeout, **2–10s** backoff, retry on **5xx**.
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `WithTimeout` | Per-attempt timeout |
+| `WithRetryMax` | Max retries |
+| `WithRetryWait` | Backoff min/max |
+| `WithCheckRetry` | `retry.DefaultRetryFn`, `retry.NoCheckRetryFn`, … |
+| `WithAuthFn` | Pre-request hook |
+| `WithRetryableClient` | Inject `*retryablehttp.Client` |
+| `WithRequester` | Same as above (interface) |
+
+## Custom retryablehttp client
+
+```go
+rc := retryablehttp.NewClient()
+rc.HTTPClient = &http.Client{Transport: myTransport}
+h := httpclient.New(httpclient.WithRetryableClient(rc))
+```
+
+## Authentication
+
+```go
+import "github.com/SolaTyolo/httpclient/auth"
+
+a := auth.New("token")
+h := httpclient.New(httpclient.WithAuthFn(a.BearAuth()))
+```
+
+## kbsink-cli / WASM
+
+Host bridges still use `net/http` **inside** retryablehttp:
+
+```go
+h := netclient.FromHostHTTP(hostClient) // wraps host *http.Client in retryablehttp
+```
+
+## Development
+
+```bash
+make test   # vet + race, all packages
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
